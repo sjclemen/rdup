@@ -1,3 +1,11 @@
+# FORK DIFFERENCES
+
+This forked copy records mtime and hashes in the internal filelist, so you
+can use them instead of ctime to determine whether or not files should be
+backed up.
+
+Original work is (c) Miek Gieben, 2005-2011.
+
 # TO BUILD
 
 Run:

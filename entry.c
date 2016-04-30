@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 - 2011 Miek Gieben
+ * Copyright (c) 2009 - 2011 Miek Gieben, 2016 Stephen Clement
  * License: GPLv3(+), see LICENSE for details
  * parse_entry.c
  * parse an standard rdup entry and return a
