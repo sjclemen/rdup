@@ -552,7 +552,7 @@ int main(int argc, char **argv)
 		} else {
 			/* write temporary file, add little comment */
 			fprintf(fplist,
-				"# mode dev inode linktype uid gid pathlen filesize path\n");
+				"# mode dev inode linktype uid gid hash pathlen filesize path\n");
 			g_tree_foreach(backup, gfunc_write, fplist);
 			fclose(fplist);
 		}
