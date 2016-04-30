@@ -8,6 +8,7 @@
 #include "rdup.h"
 #include "protocol.h"
 #include <pcre.h>
+#include <stdbool.h>
 #ifdef HAVE_LIBNETTLE
 #include <nettle/sha.h>
 #else
@@ -454,9 +455,13 @@ gboolean gfunc_write(gpointer data, gpointer value, gpointer fp)
  * write out the list of to be backupped items
  */
 gboolean
-gfunc_backup(gpointer data, gpointer value,
-	     __attribute__ ((unused)) gpointer usr)
+gfunc_backup(gpointer data, gpointer value, gpointer usr)
 {
+	GTree* curtree = (GTree *)usr;
+	struct rdup* lookup_key;
+	struct rdup* data_rdup;
+	gpointer lookup_value;
+	bool print_it = false;
 	if (sig != 0)
 		signal_abort(sig);
 
@@ -478,7 +483,28 @@ gfunc_backup(gpointer data, gpointer value,
 				    opt_format);
 			return FALSE;
 		default:	/* INC_DUMP */
-			if (((struct rdup *)data)->f_ctime >= opt_timestamp) {
+			data_rdup = (struct rdup*)data;
+			if (g_tree_lookup_extended(curtree, data, (void **)&lookup_key, &lookup_value)) {
+				print_it = true;
+				if (lookup_key->f_lnk == data_rdup->f_lnk &&
+					((lookup_key->f_target == NULL && data_rdup->f_target == NULL) ||
+						(lookup_key->f_target != NULL && data_rdup->f_target != NULL &&
+							strcmp(lookup_key->f_target, data_rdup->f_target) == 0)) &&
+					lookup_key->f_uid == data_rdup->f_uid &&
+					lookup_key->f_gid == data_rdup->f_gid &&
+					lookup_key->f_mode == data_rdup->f_mode &&
+					((data_rdup->f_mtime < opt_timestamp && S_ISREG(data_rdup->f_mode))|| data_rdup->f_ctime < opt_timestamp) &&
+					lookup_key->f_size == data_rdup->f_size &&
+					((lookup_key->f_hash == NULL && data_rdup->f_hash == NULL) ||
+						(lookup_key->f_hash != NULL && data_rdup->f_hash != NULL &&
+							strcmp(lookup_key->f_hash, data_rdup->f_hash) == 0))
+				) {					
+					print_it = false;
+				}
+			} else if (((struct rdup *)data)->f_ctime >= opt_timestamp) { // we should never go here
+				print_it = true;
+			}
+			if (print_it) {
 				entry_print(stdout, PLUS, (struct rdup *)data,
 					    opt_format);
 #if DEBUG
@@ -556,25 +582,18 @@ gint gfunc_equal(gconstpointer a, gconstpointer b)
 
 	e = strcmp(((struct rdup *)a)->f_name, ((struct rdup *)b)->f_name);
 	if (e == 0) {
-		/*
-		 * newer Linux version automount disks, so sometimes /dev/sda becomes
-		 * /dev/sdb. This leads to an full dump which isn't needed.
-		 */
-		/*
-		   if (ae->f_dev != be->f_dev)
-		   return -1;
-		 */
-		if (ae->f_ino != be->f_ino)
-			return -2;
+		// types don't match? we're not diffing this shit
+		if (!(
+			(S_ISBLK(ae->f_mode) && S_ISBLK(be->f_mode))
+			|| (S_ISCHR(ae->f_mode) && S_ISCHR(be->f_mode))
+			|| (S_ISDIR(ae->f_mode) && S_ISDIR(be->f_mode))
+			|| (S_ISFIFO(ae->f_mode) && S_ISFIFO(be->f_mode))
+			|| (S_ISREG(ae->f_mode) && S_ISREG(be->f_mode))
+			|| (S_ISLNK(ae->f_mode) && S_ISLNK(be->f_mode))
+		)) {
 
-		/* if we are looking at a directory and only the mode has changed
-		 * don't let rdup remove the entire directory */
-		if (S_ISDIR(ae->f_mode) && S_ISDIR(be->f_mode) &&
-		    ((ae->f_mode & 07777) != (be->f_mode & 07777)))
-			return 0;
-
-		if (ae->f_mode != be->f_mode)
 			return -3;
+		}
 	}
 	return e;
 }

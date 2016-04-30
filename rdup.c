@@ -33,6 +33,47 @@ GSList *child = NULL;
 			l++; \
 			continue; \
 			}
+
+/*static gboolean gfunc_match(gpointer data, __attribute__ ((unused))
+			gpointer value,	gpointer diff)
+{
+	struct matched_rdup_entry* entry;
+	gpointer match, lookup_key, lookup_value;
+	struct matched_rdup_params* params;
+	params = (struct matched_rdup_params*)diff;
+
+	if (sig != 0)
+		signal_abort(sig);
+
+
+	if (g_tree_lookup_extended(params->b, data, &lookup_key,
+			&lookup_value)) {
+		match = lookup_key;
+	} else {
+		match = NULL;
+	}
+
+	entry = malloc(sizeof(struct matched_rdup_entry));
+	entry->inlist = match;
+	entry->ondisk = (struct rdup*)data;
+	params->list = g_slist_prepend(params->list, entry);
+
+	return FALSE;
+}
+
+
+**
+ * For each element in a, attempt to find a matching item in b.
+ *
+static GSList *merge_trees_for_diff(GTree * a, GTree * b)
+{
+	struct matched_rdup_params params;
+	params.b = b;
+	params.list = NULL;
+	g_tree_foreach(a, gfunc_match, (gpointer) &params);
+	return params.list;
+}*/
+
 /**
  * subtract tree *b from tree *a, leaving
  * the elements that are only in *a. Essentially
@@ -70,6 +111,8 @@ static GTree *g_tree_read_file(FILE * fp)
 	size_t str_len;
 	dev_t f_dev;
 	ino_t f_ino;
+	uid_t f_uid;
+	gid_t f_gid;
 
 	tree = g_tree_new(gfunc_equal);
 
@@ -145,11 +188,17 @@ static GTree *g_tree_read_file(FILE * fp)
 		if (!p)
 			CORRUPT("Corrupt entry at line: %zd, no space found");
 
+		*p = '\0';
+		f_uid = atoi(q);
+
 		/* gid */
 		q = p + 1;
 		p = strchr(p + 1, ' ');
 		if (!p)
 			CORRUPT("Corrupt entry at line: %zd, no space found");
+
+		*p = '\0';
+		f_gid = atoi(q);
 
 		/* hash */
 		q = p + 1;
@@ -221,8 +270,8 @@ static GTree *g_tree_read_file(FILE * fp)
 		g_free(f_hash);
 
 		e->f_mode = modus;
-		e->f_uid = 0;	/* keep this 0 for now */
-		e->f_gid = 0;	/* keep this 0 for now */
+		e->f_uid = f_uid;
+		e->f_gid = f_gid;
 		e->f_ctime = 0;
 		e->f_mtime = 0;
 		e->f_atime = 0;
@@ -487,11 +536,11 @@ int main(int argc, char **argv)
 		list_changed = reverse(changed);
 		list_new = reverse(new);
 		g_list_foreach(list_remove, gfunc_remove_list, NULL);
-		g_list_foreach(list_changed, gfunc_backup_list, NULL);
+		g_list_foreach(list_changed, gfunc_backup_list, curtree);
 		g_list_foreach(list_new, gfunc_new_list, NULL);
 	} else {
 		g_tree_foreach(remove, gfunc_remove, NULL);
-		g_tree_foreach(changed, gfunc_backup, NULL);
+		g_tree_foreach(changed, gfunc_backup, curtree);
 		g_tree_foreach(new, gfunc_new, NULL);
 	}
 
@@ -508,6 +557,7 @@ int main(int argc, char **argv)
 			fclose(fplist);
 		}
 	}
+
 	/* re-touch the timestamp file */
 	if (stamp) {
 		if (creat(stamp, S_IRUSR | S_IWUSR) == -1) {
