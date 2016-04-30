@@ -58,7 +58,7 @@ static GTree *g_tree_subtract(GTree * a, GTree * b)
  */
 static GTree *g_tree_read_file(FILE * fp)
 {
-	gchar *buf, *p, *q;
+	gchar *buf, *p, *q, *f_hash;
 	gchar delim, linktype;
 	mode_t modus;
 	GTree *tree;
@@ -151,6 +151,18 @@ static GTree *g_tree_read_file(FILE * fp)
 		if (!p)
 			CORRUPT("Corrupt entry at line: %zd, no space found");
 
+		/* hash */
+		q = p + 1;
+		p = strchr(p + 1, ' ');
+		if (!p) {
+			CORRUPT("Corrupt entry at line %zd, no space found");
+		}
+		*p = '\0';
+		f_hash = g_strdup(q);
+		if (strlen(f_hash) != 1 && strlen(f_hash) != 40) {
+			CORRUPT("Hash should be of size 1 or 40 at line: %zd");
+		}
+
 		/* the path size */
 		q = p + 1;
 		p = strchr(p + 1, ' ');
@@ -200,6 +212,13 @@ static GTree *g_tree_read_file(FILE * fp)
 			e->f_target = NULL;
 			e->f_size = f_size;
 		}
+
+		if (f_hash[0] != '-') {
+			e->f_hash = g_strdup(f_hash);
+		} else {
+			e->f_hash = NULL;
+		}
+		g_free(f_hash);
 
 		e->f_mode = modus;
 		e->f_uid = 0;	/* keep this 0 for now */

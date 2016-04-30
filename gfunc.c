@@ -301,7 +301,11 @@ static void entry_print_data(FILE * out, char n, struct rdup *e)
 		break;
 	case 'H':		/* sha1 hash */
 		if (S_ISREG(e->f_mode)) {
-			sha1(out, e->f_name);
+			if (e->f_hash != NULL) {
+				fprintf(out, e->f_hash);
+			} else {
+				sha1(out, e->f_name);
+			}
 			break;
 		}
 		fprintf(out, NO_SHA);
@@ -407,7 +411,7 @@ gboolean gfunc_write(gpointer data, gpointer value, gpointer fp)
 	struct rdup *e = (struct rdup *)data;
 	char linktype = '-';
 	size_t file_size, name_size;
-	gchar *n;
+	gchar *n, *hash_out;
 
 	if (sig != 0)
 		signal_abort(sig);
@@ -428,13 +432,19 @@ gboolean gfunc_write(gpointer data, gpointer value, gpointer fp)
 	else
 		n = strdup(e->f_name);
 
+	if (e->f_hash != NULL) {
+		hash_out = g_strdup(e->f_hash);
+	} else {
+		hash_out = g_strdup_printf("-");
+	}
+
 	if (S_ISDIR(e->f_mode))	/* the same as in the normal output */
 		file_size = 0;
 
-	fprintf((FILE *) fp, "%5ld %ld %lld %c %ld %ld %ld %lld %s",
+	fprintf((FILE *) fp, "%5ld %ld %lld %c %ld %ld %s %ld %lld %s",
 		(long int)e->f_mode, (long int)e->f_dev, (long long)e->f_ino,
 		linktype, (long int)e->f_uid, (long int)e->f_gid,
-		(long int)name_size, (long long)file_size, n);
+		hash_out, (long int)name_size, (long long)file_size, n);
 	fputc('\n', (FILE *) fp);
 	g_free(n);
 	return FALSE;

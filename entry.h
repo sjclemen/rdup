@@ -26,6 +26,7 @@ struct rdup {
 	dev_t f_dev;		/* ID of device containing file */
 	dev_t f_rdev;		/* device ID (if special file), we use this for major, minor */
 	ino_t f_ino;		/* inode number */
+	gchar *f_hash;		/* SHA1SUM */
 };
 
 #endif  /* _ENTRY_H */

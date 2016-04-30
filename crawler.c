@@ -5,6 +5,11 @@
  * Directory crawler
  */
 #include "rdup.h"
+#ifdef HAVE_LIBNETTLE
+#include <nettle/sha.h>
+#else
+#define SHA1_DIGEST_SIZE 20
+#endif				/* HAVE_LIBNETTLE */
 
 extern gboolean opt_onefilesystem;
 extern gboolean opt_nobackup;
@@ -12,6 +17,9 @@ extern gboolean opt_chown;
 extern time_t opt_timestamp;
 extern gint opt_verbose;
 extern GSList *pregex_list;
+
+/* sha1.c */
+int sha1_stream(FILE * stream, void *digest);
 
 /* common.c */
 struct rdup *entry_dup(struct rdup *);
@@ -63,6 +71,7 @@ gboolean dir_prepend(GTree * t, char *path, GHashTable * u, GHashTable * g)
 		e.f_rdev = s.st_rdev;
 		e.f_ino = s.st_ino;
 		e.f_lnk = 0;
+		e.f_hash = NULL;
 
 		/* symlinks; also set the target */
 		if (S_ISLNK(s.st_mode)) {
@@ -88,6 +97,37 @@ gboolean dir_prepend(GTree * t, char *path, GHashTable * u, GHashTable * g)
 	return TRUE;
 }
 
+/*
+ * calculates a files sha1 sum
+ */
+static gboolean sha1_str(char *digest_out,
+		     char *filename)
+{
+#ifdef HAVE_LIBNETTLE
+	unsigned char digest[SHA1_DIGEST_SIZE];
+	gint i;
+	FILE *file;
+
+	if ((file = fopen(filename, "r")) == NULL) {
+		msg(_("Could not open '%s\': %s"), filename, strerror(errno));
+		return FALSE;
+	}
+	if (sha1_stream(file, digest) != 0) {
+		msg(_("Failed to calculate sha1 digest: `%s\'"), filename);
+		fclose(file);
+		return FALSE;
+	}
+	fclose(file);
+	for (i = 0; i < SHA1_DIGEST_SIZE; i++) {
+		snprintf(digest_out + i*2, 3, "%02x", digest[i]);
+	}
+#else
+	snprintf(digest_out, SHA1_DIGEST_SIZE*2, "%s", NO_SHA);
+#endif				/* HAVE_LIBNETTLE */
+	return TRUE;
+}
+
+
 void
 dir_crawl(GTree * t, GHashTable * linkhash, GHashTable * userhash,
 	  GHashTable * grouphash, char *path)
@@ -103,6 +143,8 @@ dir_crawl(GTree * t, GHashTable * linkhash, GHashTable * userhash,
 	struct remove_path rp;
 	dev_t current_dev;
 	size_t curpath_len;
+	char sha1sum_str[SHA1_DIGEST_SIZE*2+1];
+	sha1sum_str[SHA1_DIGEST_SIZE*2] = '\0';
 
 	/* dir stack */
 	gint32 d = 0;
@@ -202,6 +244,14 @@ dir_crawl(GTree * t, GHashTable * linkhash, GHashTable * userhash,
 					pop.f_lnk = 1;
 				}
 			}
+
+			pop.f_hash = NULL;
+			if (S_ISREG(s.st_mode)) {
+				if (sha1_str((char*)(&sha1sum_str), curpath)) {
+					pop.f_hash = strdup(sha1sum_str);
+				}
+			}
+
 			if (S_ISLNK(s.st_mode))
 				pop.f_target = slink(&pop);
 
@@ -277,6 +327,7 @@ dir_crawl(GTree * t, GHashTable * linkhash, GHashTable * userhash,
 			dirstack[d]->f_rdev = s.st_rdev;
 			dirstack[d]->f_ino = s.st_ino;
 			dirstack[d]->f_lnk = 0;
+			dirstack[d]->f_hash = NULL;
 
 			/* check for USRGRPINFO file */
 			if (opt_chown

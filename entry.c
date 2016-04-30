@@ -66,6 +66,7 @@ struct rdup *parse_entry(char *buf, size_t l)
 		e->f_ctime = s.st_ctime;
 		e->f_mtime = s.st_mtime;
 		e->f_atime = s.st_atime;
+		e->f_hash = NULL;
 
 		/* you will loose hardlink information here
 		 * as 'stat' cannot check this */
@@ -89,6 +90,7 @@ struct rdup *parse_entry(char *buf, size_t l)
 		e->f_lnk = 0;
 		e->f_target = NULL;
 		e->f_name = NULL;
+		e->f_hash = NULL;
 
 		/* 1st char should + or - */
 		if (buf[0] != '-' && buf[0] != '+') {

@@ -37,6 +37,11 @@ struct rdup *entry_dup(struct rdup *f)
 	g->f_dev = f->f_dev;
 	g->f_rdev = f->f_rdev;
 	g->f_ino = f->f_ino;
+	if (f->f_hash != NULL) {
+		g->f_hash = g_strdup(f->f_hash);
+	} else {
+		g->f_hash = NULL;
+	}
 	return g;
 }
 
@@ -46,5 +51,7 @@ void entry_free(struct rdup *f)
 		g_free(f->f_name);
 	if (f->f_target != NULL)
 		g_free(f->f_target);
+	if (f->f_hash != NULL)
+		g_free(f->f_hash);
 	g_free(f);
 }
