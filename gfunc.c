@@ -442,10 +442,11 @@ gboolean gfunc_write(gpointer data, gpointer value, gpointer fp)
 	if (S_ISDIR(e->f_mode))	/* the same as in the normal output */
 		file_size = 0;
 
-	fprintf((FILE *) fp, "%5ld %ld %lld %c %ld %ld %s %ld %lld %s",
+	fprintf((FILE *) fp, "%5ld %ld %lld %c %ld %ld %lu %s %ld %lld %s",
 		(long int)e->f_mode, (long int)e->f_dev, (long long)e->f_ino,
 		linktype, (long int)e->f_uid, (long int)e->f_gid,
-		hash_out, (long int)name_size, (long long)file_size, n);
+		(unsigned long)e->f_mtime, hash_out, (long int)name_size,
+		(long long)file_size, n);
 	fputc('\n', (FILE *) fp);
 	g_free(n);
 	return FALSE;
@@ -493,7 +494,7 @@ gfunc_backup(gpointer data, gpointer value, gpointer usr)
 					lookup_key->f_uid == data_rdup->f_uid &&
 					lookup_key->f_gid == data_rdup->f_gid &&
 					lookup_key->f_mode == data_rdup->f_mode &&
-					((data_rdup->f_mtime < opt_timestamp && S_ISREG(data_rdup->f_mode))|| data_rdup->f_ctime < opt_timestamp) &&
+					((lookup_key->f_mtime == data_rdup->f_mtime) || data_rdup->f_ctime < opt_timestamp) &&
 					lookup_key->f_size == data_rdup->f_size &&
 					((lookup_key->f_hash == NULL && data_rdup->f_hash == NULL) ||
 						(lookup_key->f_hash != NULL && data_rdup->f_hash != NULL &&

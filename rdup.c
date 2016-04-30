@@ -113,6 +113,7 @@ static GTree *g_tree_read_file(FILE * fp)
 	ino_t f_ino;
 	uid_t f_uid;
 	gid_t f_gid;
+	time_t f_mtime;
 
 	tree = g_tree_new(gfunc_equal);
 
@@ -200,6 +201,19 @@ static GTree *g_tree_read_file(FILE * fp)
 		*p = '\0';
 		f_gid = atoi(q);
 
+		/* mtime */
+		q = p + 1;
+		p = strchr(p + 1, ' ');
+		if (!p)
+			CORRUPT("Corrupt entry at line: %zd, no space found");
+
+		*p = '\0';
+		errno = 0;
+		f_mtime = strtoul((const char*)q, &p, 10);
+		if (errno != 0) {
+			CORRUPT("Failed to read mtime at line %zd");
+		}
+
 		/* hash */
 		q = p + 1;
 		p = strchr(p + 1, ' ');
@@ -273,7 +287,7 @@ static GTree *g_tree_read_file(FILE * fp)
 		e->f_uid = f_uid;
 		e->f_gid = f_gid;
 		e->f_ctime = 0;
-		e->f_mtime = 0;
+		e->f_mtime = f_mtime;
 		e->f_atime = 0;
 		e->f_user = NULL;
 		e->f_group = NULL;
@@ -552,7 +566,7 @@ int main(int argc, char **argv)
 		} else {
 			/* write temporary file, add little comment */
 			fprintf(fplist,
-				"# mode dev inode linktype uid gid hash pathlen filesize path\n");
+				"# mode dev inode linktype uid gid mtime hash pathlen filesize path\n");
 			g_tree_foreach(backup, gfunc_write, fplist);
 			fclose(fplist);
 		}
